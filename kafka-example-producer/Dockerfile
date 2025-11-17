@@ -1,8 +1,10 @@
-# Используем официальный образ OpenJDK 8 на Alpine
-FROM openjdk:8-jdk-alpine
+# Используем официальный образ Amazon Corretto 8
+FROM amazoncorretto:8
 
 # Устанавливаем Maven
-RUN apk add --no-cache maven
+RUN yum update -y && \
+    yum install -y maven && \
+    yum clean all
 
 # Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
