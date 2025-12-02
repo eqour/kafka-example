@@ -6,8 +6,8 @@ import java.util.Properties;
 public class ExampleProducer {
 
     public static void main(String[] args) {
-        String topic = "messages";
-        String kafkaServer = "kafka:9092"; // localhost without docker
+        String topic = getRequiredEnv("APP_KAFKA_TOPIC");
+        String kafkaServer = getRequiredEnv("APP_KAFKA_BOOTSTRAP_SERVERS");
         String key = "messages-key";
 
         Properties props = new Properties();
@@ -15,7 +15,7 @@ public class ExampleProducer {
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getCanonicalName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getCanonicalName());
 
-        System.out.println("Начало обработки сообщений");
+        System.out.println("Начало отправки сообщений");
 
         try (Producer<String, String> producer = new KafkaProducer<>(props)) {
             for (int i = 0; i < 100; i++) {
@@ -35,5 +35,13 @@ public class ExampleProducer {
         }
 
         System.out.println("Отправлены все сообщения");
+    }
+
+    private static String getRequiredEnv(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException("Required environment variable is missing: " + name);
+        }
+        return value;
     }
 }

@@ -1,0 +1,87 @@
+services:
+  # 1. Kafka Broker
+  kafka:
+    image: apache/kafka:4.1.1
+    container_name: kafka
+    environment:
+      # Общие настройки контейнера для режима KRaft (контроллер и брокер)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # Слушатели
+      KAFKA_LISTENERS: BROKER://kafka:8081,CONTROLLER://localhost:8082
+      KAFKA_ADVERTISED_LISTENERS: BROKER://kafka:8081
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: BROKER:PLAINTEXT,CONTROLLER:PLAINTEXT
+      # Параметры для контроллера
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@localhost:8082"
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Параметры для брокера
+      KAFKA_INTER_BROKER_LISTENER_NAME: BROKER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - kafka-network
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "kafka:8081",  "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Kafka Init (для создания топика)
+  kafka-init:
+    image: apache/kafka:4.1.1
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command: >
+      bash -c "
+        echo 'Waiting for Kafka to be ready...'
+        sleep 10
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:8081 --create --if-not-exists --topic example-topic --partitions 3 --replication-factor 1
+        echo 'Topic example-topic created successfully'
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:8081 --list
+      "
+    networks:
+      - kafka-network
+
+  # 3. Consumer Application (потребитель)
+  consumer-app:
+    build:
+      context: ./kafka-example-consumer
+      dockerfile: Dockerfile
+    container_name: consumer-app
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      APP_KAFKA_BOOTSTRAP_SERVERS: kafka:8081
+      APP_KAFKA_TOPIC: example-messages
+      APP_KAFKA_CONSUMER_GROUP_ID: example-group-id
+    networks:
+      - kafka-network
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo 'Waiting for producer to start...'"]
+      start_period: 10s
+      interval: 5s
+      timeout: 10s
+      retries: 3
+
+  # 4. Producer Application (производитель)
+  producer-app:
+    build:
+      context: ./kafka-example-producer
+      dockerfile: Dockerfile
+    container_name: producer-app
+    depends_on:
+      consumer-app:
+        condition: service_healthy
+    environment:
+      APP_KAFKA_BOOTSTRAP_SERVERS: kafka:8081
+      APP_KAFKA_TOPIC: example-messages
+    networks:
+      - kafka-network
+    restart: on-failure
+
+networks:
+  kafka-network:
+    driver: bridge

@@ -8,9 +8,9 @@ import java.util.Properties;
 public class ExampleConsumer {
 
     public static void main(String[] args) {
-        String topic = "messages";
-        String kafkaServer = "kafka:9092"; // localhost without docker
-        String groupId = "consumer-group";
+        String topic = getRequiredEnv("APP_KAFKA_TOPIC");
+        String kafkaServer = getRequiredEnv("APP_KAFKA_BOOTSTRAP_SERVERS");
+        String groupId = getRequiredEnv("APP_KAFKA_CONSUMER_GROUP_ID");
 
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServer);
@@ -21,7 +21,7 @@ public class ExampleConsumer {
         try (Consumer<String, String> consumer = new KafkaConsumer<>(props)) {
             consumer.subscribe(Collections.singletonList(topic));
 
-            System.out.println("Начало отправки сообщений");
+            System.out.println("Начало обработки сообщений");
 
             int counter = 0;
             while (counter < 100) {
@@ -32,6 +32,7 @@ public class ExampleConsumer {
                     Thread.sleep(500);
                     System.out.println("Сообщение обработано");
                     counter++;
+                    System.out.println("Значение counter после обработки: " + counter);
                 }
             }
         } catch (InterruptedException e) {
@@ -39,5 +40,13 @@ public class ExampleConsumer {
         }
 
         System.out.println("Обработаны все сообщения");
+    }
+
+    private static String getRequiredEnv(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException("Required environment variable is missing: " + name);
+        }
+        return value;
     }
 }
